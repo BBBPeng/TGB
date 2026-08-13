@@ -1,0 +1,28 @@
+Ways to build the APK
+=====================
+
+Option 1: Android Studio on this computer
+1. Install Android Studio.
+2. Open:
+   C:\Users\D\Documents\Codex\2026-08-04\wo\outputs\tgb_android_app
+3. Wait for Gradle sync.
+4. Use Build -> Build Bundle(s) / APK(s) -> Build APK(s).
+
+Option 2: GitHub Actions cloud build
+1. Create a GitHub repository.
+2. Upload the contents of this folder:
+   C:\Users\D\Documents\Codex\2026-08-04\wo\outputs\tgb_android_app
+3. Go to Actions -> Build Android APK -> Run workflow.
+4. Download the artifact named:
+   tgb-review-debug-apk
+
+Option 3: Install command-line Android toolchain
+1. Install JDK 17.
+2. Install Android command-line tools and SDK Platform 35.
+3. Install Gradle.
+4. In this folder, run:
+   gradle assembleDebug
+
+Current computer status:
+- Android Studio / SDK / Gradle were not detected in the default locations.
+- So Option 1 requires installing Android Studio first, or Option 2 can build in the cloud.
