@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>TGB复盘</title>
+  <style>
+    :root{--bg:#eef1f4;--panel:#fff;--line:#d7dce3;--text:#1f2328;--muted:#667085;--blue:#1f5fbf;--amber:#9a5b00;--green:#157f3b}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}
+    header{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:12px 14px}
+    h1{margin:0;font-size:18px} .sub{color:var(--muted);font-size:12px;margin-top:2px}
+    main{padding:12px;display:grid;gap:12px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    button,select,input,textarea{border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text);font:inherit}
+    button{height:38px;font-weight:700}.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px}
+    .section-title{display:flex;justify-content:space-between;align-items:center;margin:2px 0 8px}
+    .section-title h2{margin:0;font-size:16px}.section-title span{color:var(--muted);font-size:12px}
+    .filters{display:grid;grid-template-columns:1fr 92px;gap:8px}.filters input,.filters select{height:36px;padding:0 10px}
+    .item{display:grid;gap:7px;border-top:1px solid #e4e7ec;padding:11px 0}.item:first-child{border-top:0;padding-top:0}
+    .meta{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:12px}.badge{border-radius:999px;padding:2px 8px;font-weight:700;background:#e8f0ff;color:var(--blue)}.badge.reply{background:#fff3db;color:var(--amber)}.badge.shuo{background:#e8f7ee;color:var(--green)}
+    .title{font-weight:700}.body{white-space:pre-wrap;word-break:break-word}.body.collapsed{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+    .link{color:var(--blue);font-weight:700;text-decoration:none}.toggle{border:0;background:transparent;color:var(--blue);padding:0;height:auto;text-align:left}
+    .summary{white-space:pre-wrap}.review{display:grid;gap:8px;margin-top:10px}.review select{height:34px;padding:0 8px}.review textarea{min-height:68px;padding:8px;resize:vertical}
+    .hidden{display:none}.toast{position:fixed;left:12px;right:12px;bottom:18px;background:#111827;color:#fff;border-radius:10px;padding:10px 12px;display:none}
+  </style>
+</head>
+<body>
+<header>
+  <h1>淘股吧每日复盘</h1>
+  <div id="updated" class="sub">数据更新时间：--</div>
+</header>
+<main>
+  <div class="actions">
+    <button class="primary" onclick="refreshData()">刷新最新</button>
+    <button onclick="openLogin()">登录淘股吧</button>
+  </div>
+  <section class="panel">
+    <div class="filters">
+      <input id="kw" placeholder="搜索言论">
+      <select id="type">
+        <option value="">全部</option><option>主帖</option><option>说说</option><option>跟帖</option>
+      </select>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="section-title"><h2>最新发言</h2><span id="count"></span></div>
+    <div id="latest"></div>
+    <button id="more" class="hidden" onclick="showMore()">展开剩下</button>
+  </section>
+  <section class="panel">
+    <div class="section-title"><h2>每日汇总</h2><span>复盘记录自动保存</span></div>
+    <div id="summaries"></div>
+  </section>
+</main>
+<div id="toast" class="toast"></div>
+<script>
+const K={id:"唯一ID",time:"发布时间",type:"类型",title:"标题",body:"正文内容",link:"原文链接",topicTitle:"所属主帖标题"};
+let rows=[],notes={},visible=5;
+function call(name,arg){return new Promise((resolve,reject)=>{const cb="cb_"+Date.now()+"_"+Math.random().toString(16).slice(2);window[cb]=r=>{delete window[cb];try{resolve(JSON.parse(r))}catch(e){resolve(r)}};try{TGB[name](JSON.stringify(arg||{}),cb)}catch(e){reject(e)}})}
+function esc(v){return String(v||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function dateOf(v){const m=String(v||"").match(/\d{4}-\d{2}-\d{2}/);return m?m[0]:""}
+function toast(v){const el=document.getElementById("toast");el.textContent=v;el.style.display="block";setTimeout(()=>el.style.display="none",2200)}
+function filtered(){const kw=document.getElementById("kw").value.trim().toLowerCase();const type=document.getElementById("type").value;return rows.filter(r=>(!type||r[K.type]===type)&&(!kw||[r[K.title],r[K.body],r[K.topicTitle]].join(" ").toLowerCase().includes(kw)))}
+function badge(t){return "badge "+(t==="跟帖"?"reply":t==="说说"?"shuo":"")}
+function bodyHtml(r,i){const txt=r[K.body]||"";const long=txt.length>80||txt.split(/\n/).length>3;return `<div id="b${i}" class="body ${long?"collapsed":""}">${esc(txt)}</div>${long?`<button class="toggle" onclick="toggleBody('b${i}',this)">展开全文</button>`:""}`}
+function toggleBody(id,btn){const el=document.getElementById(id);const closed=el.classList.toggle("collapsed");btn.textContent=closed?"展开全文":"收起"}
+function itemHtml(r,i){const t=r[K.type]||"";return `<article class="item"><div class="meta"><span class="${badge(t)}">${esc(t)}</span><span>${esc(r[K.time])}</span></div><div class="title">${esc(r[K.title]||r[K.topicTitle]||"无标题")}</div>${bodyHtml(r,i)}${r[K.link]?`<a class="link" href="${esc(r[K.link])}">打开原文</a>`:""}</article>`}
+function renderLatest(){const list=filtered().sort((a,b)=>String(b[K.time]).localeCompare(String(a[K.time])));document.getElementById("count").textContent=list.length+" 条";document.getElementById("latest").innerHTML=list.slice(0,visible).map(itemHtml).join("")||"暂无记录";const left=list.length-visible;const more=document.getElementById("more");more.classList.toggle("hidden",left<=0);more.textContent="展开剩下 "+left+" 条"}
+function showMore(){visible+=3;renderLatest()}
+function hasAny(text,words){return words.some(w=>text.includes(w))}
+function unique(a,n){return Array.from(new Set(a.filter(Boolean))).slice(0,n)}
+function extract(text,mode){const words=["AI应用","AI科技","算力","CPO","光通信","芯片","半导体","机器人","核电","创新药","白酒","证券","软件","云计算","存储"];const keys=mode==="bad"?["风险","走弱","分化","调整","套牢","杀跌","悲观"]:["留意","看好","机会","走强","修复","反弹","方向"];const out=[];String(text).split(/[。！？!?\n]/).forEach(s=>{if(keys.some(k=>s.includes(k)))words.forEach(w=>{if(s.includes(w))out.push(w)})});return unique(out,8)}
+function thought(dayRows){const text=dayRows.map(r=>(r[K.title]||"")+" "+(r[K.body]||"")).join("\n");const lines=[];if(hasAny(text,["震荡","轮动","磨底"]))lines.push("市场判断：偏震荡/轮动或磨底，不按单一主线主升处理。");else if(hasAny(text,["指数","量能"]))lines.push("市场判断：重点观察指数、量能和情绪修复条件。");if(hasAny(text,["反弹","修复","超跌"]))lines.push("节奏判断：偏超跌反弹/修复思路，但需要验证持续性。");const good=extract(text,"good");if(good.length)lines.push("关注方向："+good.join("、")+"。");const bad=extract(text,"bad");if(bad.length||hasAny(text,["亏钱效应","持续性","走弱"]))lines.push("风险条件："+(bad.join("、")||"持续性不足、亏钱效应")+"。");return lines.join("\n")||"当日暂未提取到明确观点，请看原文。"}
+function reviewHtml(d){const n=notes[d]||{};return `<div class="review" data-date="${d}"><select data-f="xsgResult"><option value="">新生昨日正误</option><option ${n.xsgResult==="正"?"selected":""}>正</option><option ${n.xsgResult==="误"?"selected":""}>误</option></select><select data-f="selfResult"><option value="">自己昨日正误</option><option ${n.selfResult==="正"?"selected":""}>正</option><option ${n.selfResult==="误"?"selected":""}>误</option></select><textarea data-f="dailyAction" placeholder="每日操作">${esc(n.dailyAction)}</textarea><textarea data-f="tomorrowPrediction" placeholder="明日预测">${esc(n.tomorrowPrediction)}</textarea></div>`}
+function renderSummaries(){const map={};rows.forEach(r=>{const d=dateOf(r[K.time]);if(d)(map[d]||(map[d]=[])).push(r)});document.getElementById("summaries").innerHTML=Object.keys(map).sort().reverse().map(d=>`<article class="item"><div class="title">${d}</div><div class="summary">${esc(thought(map[d]))}</div>${reviewHtml(d)}</article>`).join("")||"暂无汇总";document.querySelectorAll(".review [data-f]").forEach(el=>el.addEventListener("input",saveNote))}
+function saveNote(e){const box=e.target.closest(".review");const d=box.dataset.date;notes[d]=notes[d]||{};notes[d][e.target.dataset.f]=e.target.value;call("saveNotes",{notes}).then(()=>toast("已保存"))}
+function render(){document.getElementById("updated").textContent="数据更新时间："+(window.generatedAt||"--");renderLatest();renderSummaries()}
+function refreshData(){toast("正在刷新...");call("refresh",{}).then(r=>{if(r.ok){rows=r.rows||rows;window.generatedAt=r.generatedAt;visible=5;render();toast("刷新完成")}else toast(r.error||"刷新失败")})}
+function openLogin(){call("openLogin",{}).then(()=>toast("请在打开的登录页完成登录"))}
+function init(){call("getData",{}).then(r=>{rows=r.rows||[];notes=r.notes||{};window.generatedAt=r.generatedAt;render()});document.getElementById("kw").addEventListener("input",()=>{visible=5;renderLatest()});document.getElementById("type").addEventListener("input",()=>{visible=5;renderLatest()})}
+init();
+</script>
+</body>
+</html>
